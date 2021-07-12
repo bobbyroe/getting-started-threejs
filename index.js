@@ -16,26 +16,89 @@ const controls = new OrbitControls(camera, renderer.domElement);
 controls.target.set(0, 0, 0);
 controls.update();
 
-const geometry = new THREE.SphereGeometry();
+const radius = 1.0;
+const geometry = new THREE.SphereGeometry(radius);
 const material = new THREE.MeshNormalMaterial({ flatShading: true });
 
 function getBall() {
-  const ball = new THREE.Mesh(geometry, material);
-  ball.position.x = THREE.MathUtils.randFloatSpread(10); 
-  ball.position.z = THREE.MathUtils.randFloatSpread(10); 
-  ball.rotation.x = THREE.MathUtils.randFloatSpread(Math.PI); 
-  return ball;
+  const mesh = new THREE.Mesh(geometry, material);
+  let x = THREE.MathUtils.randFloatSpread(10);
+  let z = THREE.MathUtils.randFloatSpread(10);
+  mesh.rotation.x = THREE.MathUtils.randFloatSpread(Math.PI);
+  mesh.position.x = x;
+  mesh.position.z = z;
+  const velocity = {
+    x: 0,
+    z: 0,
+  };
+  
+  const repelStrength = 0.0001;
+  const dampingMult = 0.98;
+  function update(allBalls) {
+    velocity.x *= dampingMult;
+    velocity.z *= dampingMult;
+    x += velocity.x;
+    z += velocity.z;
+    mesh.position.x = x;
+    mesh.position.z = z;
+
+    // This code is not optimized!
+    const direction = new THREE.Vector3(0, 0, 0);
+    allBalls.forEach((b) => {
+      const dist = b.mesh.position.distanceTo(mesh.position);
+
+      if (dist < radius * 2) {
+        direction
+          .subVectors(b.mesh.position, mesh.position)
+          .normalize()
+          .multiplyScalar(repelStrength);
+        b.velocity.x += direction.x;
+        b.velocity.z += direction.z;
+      }
+    });
+  }
+
+  return {
+    mesh,
+    velocity,
+    update,
+  };Ô
 }
 
+const balls = [];
 let numBalls = 20;
 for (let i = 0; i < numBalls; i += 1) {
   let ball = getBall();
-  scene.add(ball);
+  scene.add(ball.mesh);
+  balls.push(ball);
 }
 
 function animate() {
   requestAnimationFrame(animate);
+  balls.forEach( b => b.update(balls));
   renderer.render(scene, camera);
 }
 
 animate();
+
+function disruptBalls() {
+  const direction = new THREE.Vector3(0, 0, 0);
+  balls.forEach((b) => {
+    direction
+      .subVectors(new THREE.Vector3(0, 0, 0), b.mesh.position)
+      .normalize()
+      .multiplyScalar(Math.random() * 0.05 + 0.05);
+    b.velocity.x += direction.x;
+    b.velocity.z += direction.z;
+  });
+}
+
+function keyHandler(evt) {
+  const { key } = evt;
+  const SPACE = " ";
+  if (key === SPACE) {
+    disruptBalls();
+  }
+}
+
+window.addEventListener("keydown", keyHandler);
