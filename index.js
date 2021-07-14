@@ -1,6 +1,7 @@
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.118/build/three.module.js";
 import { OrbitControls } from "https://cdn.jsdelivr.net/npm/three@0.118/examples/jsm/controls/OrbitControls.js";
 
+let paused = true;
 const w = window.innerWidth;
 const h = window.innerHeight;
 const scene = new THREE.Scene();
@@ -31,7 +32,7 @@ function getBall() {
     x: 0,
     z: 0,
   };
-  
+
   const repelStrength = 0.0001;
   const dampingMult = 0.98;
   function update(allBalls) {
@@ -62,7 +63,8 @@ function getBall() {
     mesh,
     velocity,
     update,
-  };Ô
+  };
+  Ô;
 }
 
 const balls = [];
@@ -75,7 +77,9 @@ for (let i = 0; i < numBalls; i += 1) {
 
 function animate() {
   requestAnimationFrame(animate);
-  balls.forEach( b => b.update(balls));
+  if (paused === false) {
+    balls.forEach((b) => b.update(balls));
+  }
   renderer.render(scene, camera);
 }
 
@@ -96,8 +100,12 @@ function disruptBalls() {
 function keyHandler(evt) {
   const { key } = evt;
   const SPACE = " ";
+  const ESC = "Escape";
   if (key === SPACE) {
     disruptBalls();
+  }
+  if (key === ESC) {
+    paused = !paused;
   }
 }
 
