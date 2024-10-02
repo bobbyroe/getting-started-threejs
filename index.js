@@ -1,28 +1,27 @@
-import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.118/build/three.module.js";
-import { OrbitControls } from "https://cdn.jsdelivr.net/npm/three@0.118/examples/jsm/controls/OrbitControls.js";
+import * as THREE from "three";
+import { OrbitControls } from "jsm/controls/OrbitControls.js";
 
-let paused = true;
+let paused = false;
 const w = window.innerWidth;
 const h = window.innerHeight;
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, w / h, 0.1, 1000);
-camera.position.z = 10;
-camera.position.y = 4;
+camera.position.set(0, 4, 10);
 const renderer = new THREE.WebGLRenderer({ antiAlias: true });
 renderer.setSize(w, h);
 document.body.appendChild(renderer.domElement);
 
 // Orbit Controls
 const controls = new OrbitControls(camera, renderer.domElement);
-controls.target.set(0, 0, 0);
-controls.update();
+controls.enableDamping = true;
 
-const radius = 1.0;
-const geometry = new THREE.SphereGeometry(radius);
+const geometry = new THREE.SphereGeometry(1, 9, 6);
 const material = new THREE.MeshNormalMaterial({ flatShading: true });
 
 function getBall() {
+  const radius = 1.0;
   const mesh = new THREE.Mesh(geometry, material);
+  mesh.scale.setScalar(radius);
   let x = THREE.MathUtils.randFloatSpread(10);
   let z = THREE.MathUtils.randFloatSpread(10);
   mesh.rotation.x = THREE.MathUtils.randFloatSpread(Math.PI);
@@ -33,7 +32,7 @@ function getBall() {
     z: 0,
   };
 
-  const repelStrength = 0.0001;
+  const repelStrength = 0.0002;
   const dampingMult = 0.98;
   function update(allBalls) {
     velocity.x *= dampingMult;
@@ -44,69 +43,79 @@ function getBall() {
     mesh.position.z = z;
 
     // This code is not optimized!
-    const direction = new THREE.Vector3(0, 0, 0);
+    const direction = new THREE.Vector3();
     allBalls.forEach((b) => {
-      const dist = b.mesh.position.distanceTo(mesh.position);
+      const dist = b.position.distanceTo(mesh.position);
 
       if (dist < radius * 2) {
         direction
-          .subVectors(b.mesh.position, mesh.position)
+          .subVectors(b.position, mesh.position)
           .normalize()
           .multiplyScalar(repelStrength);
-        b.velocity.x += direction.x;
-        b.velocity.z += direction.z;
+        b.userData.velocity.x += direction.x;
+        b.userData.velocity.z += direction.z;
       }
     });
   }
-
-  return {
-    mesh,
-    velocity,
+  mesh.userData = {
     update,
-  };
-  Ô;
+    velocity,
+  }
+  return mesh;
 }
 
-const balls = [];
+const ballGroup = new THREE.Group();
+ballGroup.userData.update = () => {
+  ballGroup.children.forEach((b) => b.userData.update(ballGroup.children));
+};
+
+ballGroup.userData.disruptBalls = () => {
+  const direction = new THREE.Vector3();
+  ballGroup.children.forEach((b) => {
+    direction
+      .subVectors(new THREE.Vector3(), b.position)
+      .normalize()
+      .multiplyScalar(Math.random() * 0.05 + 0.05);
+    b.userData.velocity.x += direction.x;
+    b.userData.velocity.z += direction.z;
+  });
+};
+
+scene.add(ballGroup);
+
 let numBalls = 20;
 for (let i = 0; i < numBalls; i += 1) {
   let ball = getBall();
-  scene.add(ball.mesh);
-  balls.push(ball);
+  ballGroup.add(ball);
 }
 
 function animate() {
   requestAnimationFrame(animate);
   if (paused === false) {
-    balls.forEach((b) => b.update(balls));
+    ballGroup.userData.update();
   }
+  controls.update();
   renderer.render(scene, camera);
 }
 
 animate();
-
-function disruptBalls() {
-  const direction = new THREE.Vector3(0, 0, 0);
-  balls.forEach((b) => {
-    direction
-      .subVectors(new THREE.Vector3(0, 0, 0), b.mesh.position)
-      .normalize()
-      .multiplyScalar(Math.random() * 0.05 + 0.05);
-    b.velocity.x += direction.x;
-    b.velocity.z += direction.z;
-  });
-}
 
 function keyHandler(evt) {
   const { key } = evt;
   const SPACE = " ";
   const ESC = "Escape";
   if (key === SPACE) {
-    disruptBalls();
+    ballGroup.userData.disruptBalls();
   }
   if (key === ESC) {
     paused = !paused;
   }
 }
-
 window.addEventListener("keydown", keyHandler);
+
+function handleWindowResize() {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+window.addEventListener("resize", handleWindowResize, false);
